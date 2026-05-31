@@ -1,0 +1,205 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MIM.MainPage"
+             BackgroundColor="#121212">
+
+    <!-- Główny układ podzielony na 3 kolumny dla Desktopu -->
+    <Grid ColumnDefinitions="300, *, 250" 
+          Padding="15" 
+          ColumnSpacing="20">
+
+        <!-- ========================================== -->
+        <!-- KOLUMNA 1: Wykresy prędkości silników (Lewa)-->
+        <!-- ========================================== -->
+        <ScrollView Grid.Column="0" VerticalScrollBarVisibility="Always">
+            <VerticalStackLayout Spacing="15">
+
+                <Label Text="Stan Silników" FontSize="20" FontAttributes="Bold" TextColor="#E0E0E0" Margin="0,0,0,5" />
+
+                <!-- Silnik FL -->
+                <Border BackgroundColor="#1E1E1E" Stroke="#333333" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" HeightRequest="150">
+                    <Grid RowDefinitions="Auto, *">
+                        <Label Grid.Row="0" Text="Silnik FL (Przedni Lewy)" TextColor="#AAAAAA" FontSize="14" FontAttributes="Bold"/>
+                        <!-- Miejsce na LiveCharts/Microcharts -->
+                        <Border Grid.Row="1" BackgroundColor="#252525" Stroke="Transparent" StrokeShape="RoundRectangle 4" Margin="0,10,0,0">
+                            <Label Text="{Binding MotorSpeedFL, StringFormat='Wykres: {0} km/h'}" 
+                                   HorizontalOptions="Center" VerticalOptions="Center" TextColor="#4CAF50" FontSize="18"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Silnik FR -->
+                <Border BackgroundColor="#1E1E1E" Stroke="#333333" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" HeightRequest="150">
+                    <Grid RowDefinitions="Auto, *">
+                        <Label Grid.Row="0" Text="Silnik FR (Przedni Prawy)" TextColor="#AAAAAA" FontSize="14" FontAttributes="Bold"/>
+                        <Border Grid.Row="1" BackgroundColor="#252525" Stroke="Transparent" StrokeShape="RoundRectangle 4" Margin="0,10,0,0">
+                            <Label Text="{Binding MotorSpeedFR, StringFormat='Wykres: {0} km/h'}" 
+                                   HorizontalOptions="Center" VerticalOptions="Center" TextColor="#4CAF50" FontSize="18"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Silnik RL -->
+                <Border BackgroundColor="#1E1E1E" Stroke="#333333" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" HeightRequest="150">
+                    <Grid RowDefinitions="Auto, *">
+                        <Label Grid.Row="0" Text="Silnik RL (Tylny Lewy)" TextColor="#AAAAAA" FontSize="14" FontAttributes="Bold"/>
+                        <Border Grid.Row="1" BackgroundColor="#252525" Stroke="Transparent" StrokeShape="RoundRectangle 4" Margin="0,10,0,0">
+                            <Label Text="{Binding MotorSpeedRL, StringFormat='Wykres: {0} km/h'}" 
+                                   HorizontalOptions="Center" VerticalOptions="Center" TextColor="#4CAF50" FontSize="18"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Silnik RR -->
+                <Border BackgroundColor="#1E1E1E" Stroke="#333333" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" HeightRequest="150">
+                    <Grid RowDefinitions="Auto, *">
+                        <Label Grid.Row="0" Text="Silnik RR (Tylny Prawy)" TextColor="#AAAAAA" FontSize="14" FontAttributes="Bold"/>
+                        <Border Grid.Row="1" BackgroundColor="#252525" Stroke="Transparent" StrokeShape="RoundRectangle 4" Margin="0,10,0,0">
+                            <Label Text="{Binding MotorSpeedRR, StringFormat='Wykres: {0} km/h'}" 
+                                   HorizontalOptions="Center" VerticalOptions="Center" TextColor="#4CAF50" FontSize="18"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ========================================== -->
+        <!-- KOLUMNA 2: Główny panel kamery (Środek)  -->
+        <!-- ========================================== -->
+        <Border Grid.Column="1" 
+                BackgroundColor="#000000" 
+                Stroke="#333333" 
+                StrokeThickness="1" 
+                StrokeShape="RoundRectangle 12">
+
+            <Grid Grid.Column="1" RowDefinitions="*, Auto">
+
+                <Border Grid.Row="0" BackgroundColor="Black" StrokeShape="RoundRectangle 12">
+                </Border>
+
+                <Border Grid.Row="1" 
+            Margin="0,20,0,0" 
+            Padding="15" 
+            BackgroundColor="#1E1E1E" 
+            Stroke="#333333" 
+            StrokeShape="RoundRectangle 8">
+
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Konsola Testowa (Bluetooth)" TextColor="Gray" FontSize="12" />
+
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                            <Entry Grid.Column="0" 
+                       Placeholder="Wpisz komendę (np. W, S, STOP)" 
+                       Text="{Binding ManualCommand}" 
+                       TextColor="White"
+                       PlaceholderColor="DimGray"
+                       BackgroundColor="#121212" />
+
+                            <Button Grid.Column="1" 
+                        Text="WYŚLIJ" 
+                        Command="{Binding SendManualCommand}" 
+                        BackgroundColor="#2B579A" 
+                        TextColor="White"
+                        FontAttributes="Bold"
+                        WidthRequest="120" />
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,10,0,0">
+                            <Button Text="W" Command="{Binding SendManualCommand}" CommandParameter="W" WidthRequest="50" BackgroundColor="#444" />
+                            <Button Text="S" Command="{Binding SendManualCommand}" CommandParameter="S" WidthRequest="50" BackgroundColor="#444" />
+                            <Button Text="A" Command="{Binding SendManualCommand}" CommandParameter="A" WidthRequest="50" BackgroundColor="#444" />
+                            <Button Text="D" Command="{Binding SendManualCommand}" CommandParameter="D" WidthRequest="50" BackgroundColor="#444" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+        </Border>
+
+        <!-- ========================================== -->
+        <!-- KOLUMNA 3: Kompaktowy panel Bluetooth (Prawa) -->
+        <!-- ========================================== -->
+        <Border Grid.Column="2" 
+                BackgroundColor="#1E1E1E" 
+                Stroke="#333333" 
+                StrokeThickness="1" 
+                StrokeShape="RoundRectangle 8" 
+                Padding="15">
+
+            <Grid RowDefinitions="Auto, Auto, *, Auto" RowSpacing="15">
+
+                <Label Grid.Row="0" Text="Połączenie Łazika" FontSize="18" FontAttributes="Bold" TextColor="#E0E0E0" />
+
+                <!-- Przycisk skanowania -->
+                <Button Grid.Row="1" 
+                        Text="Skanuj urządzenia" 
+                        Command="{Binding ScanCommand}" 
+                        BackgroundColor="#2B579A" 
+                        TextColor="White" 
+                        CornerRadius="6" 
+                        FontAttributes="Bold"/>
+
+                <!-- Lista urządzeń Bluetooth -->
+                <Border Grid.Row="2" BackgroundColor="#121212" Stroke="#333333" StrokeThickness="1" StrokeShape="RoundRectangle 6">
+                    <CollectionView ItemsSource="{Binding BluetoothDevices}" 
+                                    SelectedItem="{Binding SelectedDevice}" 
+                                    SelectionMode="Single"
+                                    Margin="5">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="10,8">
+                                    <!-- VisualState zdefiniowany by podświetlić wybrany element -->
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup Name="CommonStates">
+                                            <VisualState Name="Normal" />
+                                            <VisualState Name="Selected">
+                                                <VisualState.Setters>
+                                                    <Setter Property="BackgroundColor" Value="#333333" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+
+                                    <Label Text="{Binding .}" TextColor="#E0E0E0" FontSize="14" VerticalOptions="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                        <CollectionView.EmptyView>
+                            <Label Text="Brak urządzeń" TextColor="#555555" HorizontalOptions="Center" VerticalOptions="Center" Margin="10"/>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+                </Border>
+
+                <!-- Panel przycisków i statusu -->
+                <VerticalStackLayout Grid.Row="3" Spacing="10">
+
+                    <!-- Kontrolka statusu LED -->
+                    <Border BackgroundColor="#252525" Stroke="Transparent" StrokeShape="RoundRectangle 6" Padding="10">
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
+                            <Ellipse WidthRequest="12" HeightRequest="12" Fill="{Binding ConnectionStatusColor}" VerticalOptions="Center" />
+                            <Label Text="{Binding ConnectionStatusText}" TextColor="#E0E0E0" VerticalOptions="Center" FontSize="13" FontAttributes="Bold"/>
+                        </HorizontalStackLayout>
+                    </Border>
+
+                    <Button Text="Połącz" 
+                            Command="{Binding ConnectCommand}" 
+                            BackgroundColor="#4CAF50" 
+                            TextColor="White" 
+                            CornerRadius="6" 
+                            FontAttributes="Bold"/>
+
+                    <Button Text="Rozłącz" 
+                            Command="{Binding DisconnectCommand}" 
+                            BackgroundColor="#F44336" 
+                            TextColor="White" 
+                            CornerRadius="6" 
+                            FontAttributes="Bold"/>
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</ContentPage>
