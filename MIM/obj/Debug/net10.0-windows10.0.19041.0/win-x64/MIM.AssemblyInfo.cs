@@ -18,7 +18,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MIM")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+f00977a0aa4b174f37574a8eb6629abe14850a61")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+aa800626db3af85e6e18d841e200ab16d95bfa40")]
 [assembly: System.Reflection.AssemblyProductAttribute("MIM")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MIM")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

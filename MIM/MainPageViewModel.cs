@@ -2,20 +2,24 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Timers;
+using MIM.Models;
+using MIM.Services;
+
 #if WINDOWS
-using Windows.Devices.Bluetooth;
-using Windows.Devices.Bluetooth.Rfcomm;
-using Windows.Devices.Enumeration;
+using Windows.Networking;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 #endif
-using System.IO;
 
 namespace MIM
 {
     public class MainPageViewModel : INotifyPropertyChanged
     {
-        // --- Pola prywatne ---
+        private readonly IGamepadService _gamepadService;
+        private readonly System.Timers.Timer _sendTimer;
+        private bool _isSending;
+
         private double _motorSpeedFL;
         private double _motorSpeedFR;
         private double _motorSpeedRL;
@@ -25,59 +29,128 @@ namespace MIM
         private bool _isConnected;
         private Color _connectionStatusColor;
         private string _connectionStatusText;
+        private string _manualCommand;
+
+        private double _leftStickX;
+        private double _leftStickY;
+        private double _rightStickX;
+        private double _rightStickY;
+        private string _gamepadStatus;
+        private bool _isGamepadConnected;
+
 #if WINDOWS
         private StreamSocket _socket;
         private DataWriter _writer;
         private DataReader _reader;
+        private const string EspIp = "172.20.10.10";   // ZMIEŃ NA IP TWOJEGO ESP
+        private const string EspPort = "8080";
 #endif
-        private string _manualCommand;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public MainPageViewModel()
+        {
+            _gamepadService = new WindowsGamepadService();
+            _gamepadService.GamepadStateChanged += OnGamepadStateChanged;
+            _gamepadService.Start();
+
+            _sendTimer = new System.Timers.Timer(100);
+            _sendTimer.AutoReset = true;
+            _sendTimer.Elapsed += SendTimerElapsed;
+            _sendTimer.Start();
+
+            BluetoothDevices = new ObservableCollection<string>();
+
+            VideoStreamStatus = "Oczekiwanie na strumień wideo... (00:00:00)";
+            ConnectionStatusColor = Colors.Red;
+            ConnectionStatusText = "Rozłączono";
+            GamepadStatus = "Pad: brak";
+            IsGamepadConnected = false;
+
+            MotorSpeedFL = 0;
+            MotorSpeedFR = 0;
+            MotorSpeedRL = 0;
+            MotorSpeedRR = 0;
+
+            ScanCommand = new Command(ExecuteScan);
+            ConnectCommand = new Command(ExecuteConnect, () => !IsConnected);
+            DisconnectCommand = new Command(ExecuteDisconnect, () => IsConnected);
+        }
+
         public string ManualCommand
         {
             get => _manualCommand;
             set { _manualCommand = value; OnPropertyChanged(); }
         }
 
-        // Komenda wywoływana przez przycisk "Wyślij"
-        public ICommand SendManualCommand => new Command(async () =>
+        public double LeftStickX
         {
-            if (!string.IsNullOrWhiteSpace(ManualCommand))
-            {
-                await SendRoverCommand(ManualCommand);
-                // Opcjonalnie: czyść pole po wysłaniu
-                // ManualCommand = string.Empty; 
-            }
-        });
+            get => _leftStickX;
+            set { _leftStickX = value; OnPropertyChanged(); }
+        }
+
+        public double LeftStickY
+        {
+            get => _leftStickY;
+            set { _leftStickY = value; OnPropertyChanged(); }
+        }
+
+        public double RightStickX
+        {
+            get => _rightStickX;
+            set { _rightStickX = value; OnPropertyChanged(); }
+        }
+
+        public double RightStickY
+        {
+            get => _rightStickY;
+            set { _rightStickY = value; OnPropertyChanged(); }
+        }
+
+        public string GamepadStatus
+        {
+            get => _gamepadStatus;
+            set { _gamepadStatus = value; OnPropertyChanged(); }
+        }
+
+        public bool IsGamepadConnected
+        {
+            get => _isGamepadConnected;
+            set { _isGamepadConnected = value; OnPropertyChanged(); }
+        }
+
         public bool IsNotConnected => !IsConnected;
-        // --- Właściwości dla silników ---
+
         public double MotorSpeedFL
         {
             get => _motorSpeedFL;
             set { _motorSpeedFL = value; OnPropertyChanged(); }
         }
+
         public double MotorSpeedFR
         {
             get => _motorSpeedFR;
             set { _motorSpeedFR = value; OnPropertyChanged(); }
         }
+
         public double MotorSpeedRL
         {
             get => _motorSpeedRL;
             set { _motorSpeedRL = value; OnPropertyChanged(); }
         }
+
         public double MotorSpeedRR
         {
             get => _motorSpeedRR;
             set { _motorSpeedRR = value; OnPropertyChanged(); }
         }
 
-        // --- Właściwości wideo ---
         public string VideoStreamStatus
         {
             get => _videoStreamStatus;
             set { _videoStreamStatus = value; OnPropertyChanged(); }
         }
 
-        // --- Właściwości Bluetooth ---
         public ObservableCollection<string> BluetoothDevices { get; set; }
 
         public string SelectedDevice
@@ -98,7 +171,7 @@ namespace MIM
             {
                 _isConnected = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(IsNotConnected)); // <--- DODAJ TĘ LINIJKĘ
+                OnPropertyChanged(nameof(IsNotConnected));
                 ((Command)ConnectCommand).ChangeCanExecute();
                 ((Command)DisconnectCommand).ChangeCanExecute();
             }
@@ -116,122 +189,136 @@ namespace MIM
             set { _connectionStatusText = value; OnPropertyChanged(); }
         }
 
-        // --- Komendy ---
         public ICommand ScanCommand { get; }
         public ICommand ConnectCommand { get; }
         public ICommand DisconnectCommand { get; }
 
-        public MainPageViewModel()
+        public ICommand SendManualCommand => new Command(async () =>
         {
-            BluetoothDevices = new ObservableCollection<string>();
+            if (!string.IsNullOrWhiteSpace(ManualCommand))
+            {
+                string[] parts = ManualCommand.Split(',');
+                if (parts.Length == 4 &&
+                    byte.TryParse(parts[0], out byte m1) &&
+                    byte.TryParse(parts[1], out byte m2) &&
+                    byte.TryParse(parts[2], out byte m3) &&
+                    byte.TryParse(parts[3], out byte m4))
+                {
+                    await SendRawBytes(new[] { m1, m2, m3, m4 });
+                }
+            }
+        });
 
-            // Inicjalizacja domyślnych wartości
-            VideoStreamStatus = "Oczekiwanie na strumień wideo... (00:00:00)";
-            ConnectionStatusColor = Colors.Red;
-            ConnectionStatusText = "Rozłączono";
+        private void OnGamepadStateChanged(object sender, GamepadState state)
+        {
+            IsGamepadConnected = state.IsConnected;
+            GamepadStatus = state.IsConnected ? $"Pad: {state.DeviceName}" : "Pad: brak";
 
-            // Przykładowe wartości prędkości silników
-            MotorSpeedFL = 12.5;
-            MotorSpeedFR = 12.5;
-            MotorSpeedRL = 13.0;
-            MotorSpeedRR = 13.0;
+            LeftStickX = state.LeftStickX;
+            LeftStickY = state.LeftStickY;
+            RightStickX = state.RightStickX;
+            RightStickY = state.RightStickY;
 
-            // Inicjalizacja komend
-            ScanCommand = new Command(ExecuteScan);
-            ConnectCommand = new Command(ExecuteConnect, () => !IsConnected && !string.IsNullOrEmpty(SelectedDevice));
-            DisconnectCommand = new Command(ExecuteDisconnect, () => IsConnected);
+            MotorSpeedFL = ScaleStickToSpeedDisplay(LeftStickY);
+            MotorSpeedRL = ScaleStickToSpeedDisplay(LeftStickY);
+            MotorSpeedFR = ScaleStickToSpeedDisplay(RightStickY);
+            MotorSpeedRR = ScaleStickToSpeedDisplay(RightStickY);
         }
 
-        private async void ExecuteScan()
+        private async void SendTimerElapsed(object sender, ElapsedEventArgs e)
         {
-            BluetoothDevices.Clear();
-            ConnectionStatusText = "Próba dostępu do sprzętu...";
-
 #if WINDOWS
+            if (!IsConnected || _isSending || !IsGamepadConnected)
+                return;
+
+            _isSending = true;
+
             try
             {
-                ConnectionStatusText = "Pobieranie sparowanych urządzeń...";
+                byte speedFL = ScaleStickToSpeed(LeftStickY);
+                byte speedRL = ScaleStickToSpeed(LeftStickY);
+                byte speedFR = ScaleStickToSpeed(RightStickY);
+                byte speedRR = ScaleStickToSpeed(RightStickY);
 
-                // Selektor szukający urządzeń Bluetooth, które są SPAROWANE
-                // Używamy GUID dla usług RFCOMM (Serial Port Profile - SPP), z których korzysta HC-05
-                string selector = BluetoothDevice.GetDeviceSelectorFromPairingState(true);
+                bool dirFL = LeftStickY >= 0;
+                bool dirRL = LeftStickY >= 0;
+                bool dirFR = RightStickY >= 0;
+                bool dirRR = RightStickY >= 0;
 
-                var devices = await DeviceInformation.FindAllAsync(selector);
-
-                if (devices.Count == 0)
+                byte[] packet = new byte[]
                 {
-                    ConnectionStatusText = "Nie znaleziono sparowanych urządzeń.";
-                    return;
-                }
+                    BuildMotorFrame(0, dirFL, speedFL), // FL
+                    BuildMotorFrame(1, dirFR, speedFR), // FR
+                    BuildMotorFrame(2, dirRL, speedRL), // RL
+                    BuildMotorFrame(3, dirRR, speedRR)  // RR
+                };
 
-                foreach (var device in devices)
-                {
-                    // HC-05 czasami ma nazwę, a czasami tylko ID
-                    string name = !string.IsNullOrEmpty(device.Name) ? device.Name : device.Id;
-
-                    if (!BluetoothDevices.Contains(name))
-                    {
-                        BluetoothDevices.Add(name);
-                        System.Diagnostics.Debug.WriteLine($"---> ZNALEZIONO SPAROWANE: {name}");
-                    }
-                }
-
-                ConnectionStatusText = $"Znaleziono {BluetoothDevices.Count} sparowanych.";
-                ConnectionStatusColor = Colors.Green;
+                await SendRawBytes(packet);
             }
-            catch (Exception ex)
+            finally
             {
-                System.Diagnostics.Debug.WriteLine($"BŁĄD: {ex.Message}");
-                ConnectionStatusText = "Błąd dostępu do listy urządzeń.";
+                _isSending = false;
             }
 #endif
         }
 
+        private void ExecuteScan()
+        {
+            BluetoothDevices.Clear();
+            ConnectionStatusText = "Tryb TCP/Wi‑Fi: skan Bluetooth nie jest używany.";
+            ConnectionStatusColor = Colors.Orange;
+        }
+
         private async void ExecuteConnect()
         {
-            if (string.IsNullOrEmpty(SelectedDevice)) return;
-
 #if WINDOWS
             try
             {
-                ConnectionStatusText = "Łączenie...";
+                ConnectionStatusText = "Łączenie z ESP po TCP...";
+                ConnectionStatusColor = Colors.Orange;
 
-                var devices = await DeviceInformation.FindAllAsync(BluetoothDevice.GetDeviceSelectorFromPairingState(true));
-                var deviceInfo = devices.FirstOrDefault(d => d.Name == SelectedDevice);
+                _socket = new StreamSocket();
+                await _socket.ConnectAsync(new HostName(EspIp), EspPort);
 
-                if (deviceInfo == null) return;
+                _writer = new DataWriter(_socket.OutputStream);
+                _reader = new DataReader(_socket.InputStream);
 
-                var bluetoothDevice = await BluetoothDevice.FromIdAsync(deviceInfo.Id);
-                var rfcommServices = await bluetoothDevice.GetRfcommServicesAsync();
-
-                if (rfcommServices.Services.Count > 0)
-                {
-                    var service = rfcommServices.Services[0];
-                    _socket = new StreamSocket();
-
-                    await _socket.ConnectAsync(service.ConnectionHostName, service.ConnectionServiceName);
-
-                    _writer = new DataWriter(_socket.OutputStream);
-                    _reader = new DataReader(_socket.InputStream);
-
-                    IsConnected = true;
-                    ConnectionStatusText = "POŁĄCZONO";
-                    ConnectionStatusColor = Colors.Green;
-                }
+                IsConnected = true;
+                ConnectionStatusText = $"POŁĄCZONO Z ESP ({EspIp}:{EspPort})";
+                ConnectionStatusColor = Colors.Green;
             }
             catch (Exception ex)
             {
-                ConnectionStatusText = "Błąd połączenia";
-                System.Diagnostics.Debug.WriteLine($"Błąd: {ex.Message}");
+                ConnectionStatusText = $"Błąd połączenia: {ex.Message}";
+                ConnectionStatusColor = Colors.Red;
+                ExecuteDisconnect();
             }
 #else
-    // Opcjonalny komunikat dla wersji Android/iOS
-    await App.Current.MainPage.DisplayAlert("Info", "Bluetooth Classic w tej wersji obsługuje tylko Windows Desktop.", "OK");
+            ConnectionStatusText = "TCP w tej konfiguracji działa tylko na Windows.";
+            ConnectionStatusColor = Colors.Red;
 #endif
         }
 
         private void ExecuteDisconnect()
         {
+#if WINDOWS
+            try
+            {
+                _writer?.DetachStream();
+                _writer?.Dispose();
+                _reader?.DetachStream();
+                _reader?.Dispose();
+                _socket?.Dispose();
+            }
+            catch
+            {
+            }
+
+            _writer = null;
+            _reader = null;
+            _socket = null;
+#endif
+
             IsConnected = false;
             SelectedDevice = null;
             ConnectionStatusText = "Rozłączono";
@@ -239,38 +326,55 @@ namespace MIM
             VideoStreamStatus = "Utracono połączenie wideo.";
         }
 
-        // --- INotifyPropertyChanged ---
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private byte BuildMotorFrame(byte motorId, bool forward, byte speed)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            motorId = (byte)(motorId & 0b00000011);
+            byte direction = (byte)(forward ? 1 : 0);
+            speed = (byte)(speed & 0b00011111);
+
+            return (byte)((motorId << 6) | (direction << 5) | speed);
         }
-        public async Task SendRoverCommand(string command)
+
+        private byte ScaleStickToSpeed(double value)
+        {
+            double absValue = Math.Abs(value);
+
+            if (absValue < 0.05)
+                return 0;
+
+            if (absValue > 1.0)
+                absValue = 1.0;
+
+            return (byte)Math.Round(absValue * 31.0);
+        }
+
+        private double ScaleStickToSpeedDisplay(double value)
+        {
+            return ScaleStickToSpeed(value);
+        }
+
+        public async Task SendRawBytes(byte[] values)
         {
 #if WINDOWS
-            if (_writer == null || !IsConnected)
-            {
-                System.Diagnostics.Debug.WriteLine("Błąd: Nie połączono z łazikiem.");
+            if (_socket == null || _writer == null || !IsConnected || values == null || values.Length == 0)
                 return;
-            }
 
             try
             {
-                _writer.WriteString(command);
-
-                // StoreAsync faktycznie wysyła dane z bufora do urządzenia
+                _writer.WriteBytes(values);
                 await _writer.StoreAsync();
-                // FlushAsync upewnia się, że strumień jest czysty
                 await _writer.FlushAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Wysłano: {command}");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Błąd wysyłania: {ex.Message}");
-                ExecuteDisconnect(); // Rozłącz przy błędzie transmisji
+                ExecuteDisconnect();
             }
 #endif
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

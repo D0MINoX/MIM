@@ -62,6 +62,14 @@
                     </Grid>
                 </Border>
 
+                <VerticalStackLayout Spacing="6" Padding="12">
+                    <Label Text="{Binding GamepadStatus}" FontAttributes="Bold" />
+                    <Label Text="{Binding LeftStickX, StringFormat='LX: {0}'}" />
+                    <Label Text="{Binding LeftStickY, StringFormat='LY: {0}'}" />
+                    <Label Text="{Binding RightStickX, StringFormat='RX: {0}'}" />
+                    <Label Text="{Binding RightStickY, StringFormat='RY: {0}'}" />
+                </VerticalStackLayout>
+
             </VerticalStackLayout>
         </ScrollView>
 
@@ -77,6 +85,11 @@
             <Grid Grid.Column="1" RowDefinitions="*, Auto">
 
                 <Border Grid.Row="0" BackgroundColor="Black" StrokeShape="RoundRectangle 12">
+
+                        <WebView Source="http://172.20.10.10/" 
+             HorizontalOptions="Fill" 
+             VerticalOptions="Fill" />
+
                 </Border>
 
                 <Border Grid.Row="1" 
